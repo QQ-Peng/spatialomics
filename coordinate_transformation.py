@@ -2,6 +2,61 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import xml.etree.ElementTree as ET
+# %%
+# 读取xml文件里的坐标信息
+def read_xml_coordinates(xml_file):
+    """
+    从XML内容中提取校准点坐标和所有形状的坐标
+    
+    参数:
+    xml_content: XML文件内容字符串
+    
+    返回:
+    包含校准点坐标和形状坐标的字典
+    """
+    # 解析XML
+    root = ET.parse(xml_file).getroot()
+    
+    # 提取校准点坐标
+    calibration_points = []
+    for i in range(1, 4):  # 假设有3个校准点
+        x_key = f"X_CalibrationPoint_{i}"
+        y_key = f"Y_CalibrationPoint_{i}"
+        
+        if x_key in [elem.tag for elem in root] and y_key in [elem.tag for elem in root]:
+            x = root.find(x_key).text
+            y = root.find(y_key).text
+            calibration_points.append({"label": f"CalibrationPoint_{i}", "x": int(x), "y": int(y)})
+    
+    # 提取形状信息
+    shapes = []
+    shape_count = int(root.find("ShapeCount").text)
+    
+    for i in range(1, shape_count + 1):
+        shape_elem = root.find(f"Shape_{i}")
+        if shape_elem is not None:
+            cap_id = shape_elem.find("CapID").text
+            point_count = int(shape_elem.find("PointCount").text)
+            
+            # 提取该形状的所有点坐标
+            points = []
+            for j in range(1, point_count + 1):
+                x = shape_elem.find(f"X_{j}").text
+                y = shape_elem.find(f"Y_{j}").text
+                points.append({'X_{j}':int(x), 'Y_{j}':int(y)})
+            
+            shapes.append({
+                "shape_id": f"Shape_{i}",
+                "cap_id": cap_id,
+                "point_count": point_count,
+                "points": points
+            })
+    
+    return {
+        "calibration_points": calibration_points,
+        "shapes": shapes
+    }
 # %%
 def calculate_affine_transform(A_coords, B_coords):
     """
@@ -177,7 +232,38 @@ def main():
         
     except ValueError as e:
         print(f"错误: {e}")
-
+#%%
 if __name__ == "__main__":
-    main()
+    # main()
+    import plotly.express as px
+    coordinates = read_xml_coordinates('data/_20250825_112121_0#1_2.xml')
+    # print(coordinates)
+    # plt.figure(figsize=(5, 5))
+    # for point in coordinates['calibration_points']:
+    #     label,x,y = point['label'],point['x'],point['y']
+    #     plt.scatter(x,y,label=label)
+    # plt.legend()
+    # plt.show()
+    x = []
+    y = []
+    category = []
+    for shape in coordinates['shapes']:
+        # print(shape)
+        
+        shape_id,cap_id,point_count,points = shape['shape_id'],shape['cap_id'],shape['point_count'],shape['points']
+        for point in points:
+            x.append(point['X_{j}'])
+            y.append(point['Y_{j}'])
+            category.append(shape_id)
+
+    for point in coordinates['calibration_points']:
+        # label,x,y = point['label'],point['x'],point['y']
+        x.append(point['x'])
+        y.append(point['y'])
+        category.append(point['label'])
+
+    fig = px.scatter(x=x, y=y, color=category)
+    fig.show()
+    # plt.show()
+    # plt.close()
 # %%
